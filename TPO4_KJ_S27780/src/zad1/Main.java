@@ -1,14 +1,11 @@
-/**
- *
- *  @author Karwowski Jakub S27780
- *
- */
-
 package zad1;
 
-
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main {
 
@@ -22,7 +19,7 @@ public class Main {
     Map<String, List<String>> clRequests = opts.getClientsMap();
     ExecutorService es = Executors.newCachedThreadPool();
     List<ClientTask> ctasks = new ArrayList<>();
-    List<String> clogs = new ArrayList<>(); 
+    List<String> clogs = new ArrayList<>();
 
     Server s = new Server(host, port);
     s.startServer();
@@ -48,12 +45,8 @@ public class Main {
 
     if (concur) {
       ctasks.forEach( task -> {
-        try {
-          String log = task.get();
-          clogs.add(log);
-        } catch (InterruptedException | ExecutionException exc) {
-          System.out.println(exc);
-        }
+        String log = task.get();
+        clogs.add(log);
       });
       clogs.forEach( System.out::println);
       es.shutdown();
