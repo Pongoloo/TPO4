@@ -12,7 +12,10 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
+import java.nio.CharBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class Client {
@@ -21,67 +24,50 @@ public class Client {
     private int port;
     private String id;
 
-    private Socket socket;
+    Socket socket;
+    PrintWriter out;
+    BufferedReader in;
+
 
     public Client(String host, int port, String id) {
         this.host = host;
         this.port = port;
         this.id = id;
+
+
     }
 
     public void connect() {
         try {
-             this.socket = new Socket(host, port);
-            System.out.println("connected");
+            socket = new Socket(host, port);
+            out = new PrintWriter(socket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
     public String send(String req) {
+        out.println(req);
+        return readResponse();
+    }
 
-        try (
-                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(socket.getInputStream()));
-        ) {
-            out.println(req);
-            return in.lines().collect(Collectors.joining());
-
+    private String readResponse() {
+        CharBuffer allocate = CharBuffer.allocate(1024);
+        try {
+            int read = in.read(allocate);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public String getHost() {
-        return host;
-    }
-
-    public void setHost(String host) {
-        this.host = host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public void setPort(int port) {
-        this.port = port;
+        //toDo potecjalnie ify obslugujace czy read==-1 i read==0
+        // still works so fuck it B)
+        allocate.flip();
+        return allocate.toString();
     }
 
     public String getId() {
-        return id;
+        return this.id;
     }
 
-    public void setId(String id) {
-        this.id = id;
-    }
 
-    public Socket getSocket() {
-        return socket;
-    }
-
-    public void setSocket(Socket socket) {
-        this.socket = socket;
-    }
 }

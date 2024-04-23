@@ -7,6 +7,7 @@
 package zad1;
 
 
+import java.io.IOException;
 import java.util.List;
 
 public class ClientTask implements Runnable{
@@ -48,7 +49,7 @@ public class ClientTask implements Runnable{
     private void handleClientShowingServerOutputs() {
         client.connect();
 
-        System.out.println(client.send("login " + client.getId()) + " hoho");
+        System.out.println(client.send("login " + client.getId()));
 
         for (String requirement : requirements) {
             System.out.println(client.send(requirement));
@@ -81,6 +82,7 @@ public class ClientTask implements Runnable{
     public void setShowRes(boolean showRes) {
         this.showRes = showRes;
     }
+
 
 
 }

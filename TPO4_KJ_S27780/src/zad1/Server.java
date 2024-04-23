@@ -1,160 +1,240 @@
-/**
- *
- *  @author Karwowski Jakub S27780
- *
- */
-
 package zad1;
-
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.SocketAddress;
-import java.net.SocketOption;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.channels.*;
 import java.nio.charset.Charset;
-import java.sql.SQLOutput;
+import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
-public class Server extends Thread{
+public class Server extends Thread {
+
+   private Map<SocketChannel,String> userMaps;
+    private Map<String,StringBuilder> logs;
+    private StringBuilder serverLog;
     private String host;
     private int port;
-    private volatile boolean isActive;
 
-    private ServerSocketChannel serverSocketChannel;
+    private  ServerSocketChannel channel;
     private Selector selector;
+    private volatile boolean isRunning=true;
 
-    public Server(String host, int port){
-        this.host=host;
-        this.port=port;
+    Server(String host, int port) {
+        userMaps= new HashMap<>();
+        logs = new HashMap<>();
+        serverLog =new StringBuilder();
+        this.host = host;
+        this.port = port;
     }
 
-    // uruchamia serwer w oddzielnym wątku
-    public void startServer() {
-        isActive=true;
-        try {
-            this.serverSocketChannel=ServerSocketChannel.open();
-            serverSocketChannel.configureBlocking(false);
-            serverSocketChannel.bind(new InetSocketAddress(host, port));
-            this.selector = Selector.open();
-            serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-            this.start();
-
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public void startServer() throws IOException {
+        this.start();
     }
-
+    public void stopServer() {
+        isRunning=false;
+    }
     @Override
     public void run() {
-        try {
-            serviceConnections(serverSocketChannel,selector);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
+        try (
+                ServerSocketChannel socketChannel = ServerSocketChannel.open();
+                Selector selector1 = Selector.open();
+        ) {
+            this.channel = socketChannel;
+            this.selector = selector1;
+
+            channel.configureBlocking(false);
+            channel.bind(new InetSocketAddress(host, port));
+
+            channel.register(selector, SelectionKey.OP_ACCEPT);
+
+            handleConnections();
+        } catch (IOException e) {
+            System.out.println("__________________________________");
+            System.out.println(serverLog);
         }
     }
-    private void serviceConnections(ServerSocketChannel serverSocketChannel, Selector selector) throws IOException {
 
-        while(isActive){
+    public void handleConnections() throws IOException {
+
+        while (isRunning) {
             selector.select();
-
             Set<SelectionKey> selectionKeys = selector.selectedKeys();
             Iterator<SelectionKey> iterator = selectionKeys.iterator();
-            String response=null;
-            while(iterator.hasNext()) {
+
+            while (iterator.hasNext()) {
                 SelectionKey key = iterator.next();
                 iterator.remove();
 
-
-                if(key.isAcceptable()){
-                    SocketChannel socketChannel = serverSocketChannel.accept();
-
-                    socketChannel.configureBlocking(false);
-
-                    socketChannel.register(selector,SelectionKey.OP_READ);
+                if (key.isAcceptable()) {
+                    SocketChannel accept = channel.accept();
+                    accept.configureBlocking(false);
+                    accept.register(selector, SelectionKey.OP_READ);
                     continue;
                 }
-                if(key.isReadable()){
-                    System.out.println("weszlismy do readable");
-                    SocketChannel socketChannel =(SocketChannel) key.channel();
-                     response = handleRequest(socketChannel);
-                    socketChannel.register(selector,SelectionKey.OP_WRITE);
-                }
-                if(key.isWritable()){
-                    SocketChannel socketChannel =(SocketChannel) key.channel();
-                    ByteBuffer wrap = ByteBuffer.wrap(response.getBytes(Charset.defaultCharset()));
-                    socketChannel.write(wrap);
+
+                if (key.isReadable()) {
+                    SocketChannel socketChannel = (SocketChannel) key.channel();
+                    socketChannel.configureBlocking(false);
+                    handleRequset(socketChannel);
 
                 }
-
             }
         }
     }
-    private String handleRequest(SocketChannel socketChannel) throws IOException {
-         ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
-         String request;
-         if(!socketChannel.isOpen()){
-             return null;
-         }
-         byteBuffer.clear();
 
-        int read = socketChannel.read(byteBuffer);
-        System.out.println("READ:"+read);
-        if(read==-1){
+    public void handleRequset (SocketChannel socketChannel) throws IOException {
+        if (!socketChannel.isOpen()) {
+            return;
+        }
+        ByteBuffer buffer = ByteBuffer.allocateDirect(1024);
+        int bytesRead = socketChannel.read(buffer);
+        if (bytesRead == -1) {
+            System.out.println("connection done and dusted bytesRead:-1");
             socketChannel.close();
         }
-        if(read > 0){
-            byteBuffer.flip();
-            CharBuffer charBuffer = Charset.defaultCharset().decode(byteBuffer);
-
-            request = charBuffer.toString();
-            return handleSpecificCommands(request);
+        if (bytesRead == 0) {
+            System.out.println("everything that needed to be said was said...");
         }
+        if (bytesRead > 0) {
+            buffer.flip();
+            byte[] bytes = new byte[buffer.remaining()];
+            buffer.get(bytes);
+            String request = new String(bytes);
+            System.out.print("odczytana wiadomosc: " + request);
 
-    return null;
-    }
-    private String handleSpecificCommands(String command){
-        if(command.equals("bye")){
-            return "logged out";
-        } else if(command.equals("bye and log transfer")){
-            //toDo wyslanie logu klienta tutaj
-        } else{
-            String[] words = command.split(" ");
-            if(words[0].equals("login")){
-                return "logged in";
-            } else{
-                return Time.passed(words[0], words[1]);
+            writeResponse(socketChannel,request);
+            if (request.equals("nara")) {
+                socketChannel.close();
             }
         }
-        return "wrong input";
+
     }
-    // zatrzymuje działanie serwera i wątku w którym działa
-    public void stopServer(){
-        isActive=false;
+    public void writeResponse (SocketChannel socketChannel, String request) throws IOException {
+        String response;
+        if(request.charAt(0)=='l'){ // login
+            String[] words = request.split(" ");
+            putNewUserInDB(strip(words[1]),socketChannel);
+            response= login(strip(words[1]));
+        } else{
+            response=getResponse(request,getIdByChannel(socketChannel));
+        }
+        ByteBuffer encode = Charset.defaultCharset().encode(response);
+        socketChannel.write(encode);
     }
-    // zwraca ogólny log serwera
-     String getServerLog(){
-        return null;
-     }
-    public String getHost() {
-        return host;
+    private String getResponse(String request, String id){
+        updateGeneralLog(request,id);
+        updatePersonalLog(request,id);
+
+        if(request.equals("bye")){
+            return "logged out";
+        } else{
+            String[] words = request.split(" ");
+            if(words[0].equals("login")){
+                return "logged in";
+            } else if(words[0].equals("bye")){
+                return getLogs().get(id).toString();
+            } else{
+                return Time.passed(strip(words[0]),strip(words[1]));
+            }
+        }
+    }
+    private void updatePersonalLog(String request, String id){
+        if(request.charAt(0)=='l'){
+            logs.put(id,new StringBuilder());
+            logs.get(id).append("=== ").append(id).append(" log start ===\nlogged in\n");
+        }else if(request.charAt(0)=='b'){
+            System.out.println(id);
+            System.out.println(id.length());
+            logs.get(id).append("logged out\n=== ").append(id).append(" log end ===\n");
+        } else{
+            logs.get(id).append("Request: ").append(request).append("Result:\n");
+            String[] dates = request.split(" ");
+            System.out.println(dates[0].equals("2019-01-10"));
+            System.out.println(dates[1].equals("2020-03-01"));
+            System.out.println(dates[1].length());
+            System.out.println("2020-03-01".length());
+            System.out.println(Time.passed(dates[0],dates[1]));
+            logs.get(id).append(Time.passed(strip(dates[0]),strip(dates[1]))).append('\n');
+        }
+    }
+    private void updateGeneralLog(String request, String id){
+        LocalTime now = LocalTime.now();
+        String hourMinuteSecond = now.toString().substring(0, 9);
+        String nanoSeconds = (now.getNano() + "").substring(0, 3);
+        String time=hourMinuteSecond+nanoSeconds;
+        if(request.charAt(0)=='l'){
+            serverLog.append(id).append(" logged in at ").append(time).append('\n');
+        }else if(request.charAt(0)=='b'){
+            serverLog.append(id).append(" logged out at ").append(time).append('\n');
+
+        } else{
+            String s = request.replaceAll("\r\n", "");
+            serverLog.append(id).append(" request at ").
+                    append(time).append(": \"").append(s).append("\"").append("\n");
+        }
+    }
+    private String login(String id){
+        updatePersonalLog("login",id);
+        updateGeneralLog("login",id);
+        return "logged in";
+    }
+    private void putNewUserInDB(String id, SocketChannel socketChannel){
+        userMaps.put(socketChannel, id);
+        logs.put(id,new StringBuilder());
+    }
+    private String getIdByChannel(SocketChannel socketChannel){
+        return userMaps.get(socketChannel);
+    }
+    private String strip(String string){
+        return string.replaceAll("\\s", "");
     }
 
-    public int getPort() {
-        return port;
+    public Map<SocketChannel, String> getUserMaps() {
+        return userMaps;
+    }
+
+    public void setUserMaps(Map<SocketChannel, String> userMaps) {
+        this.userMaps = userMaps;
+    }
+
+    public Map<String, StringBuilder> getLogs() {
+        return logs;
+    }
+
+    public void setLogs(Map<String, StringBuilder> logs) {
+        this.logs = logs;
+    }
+
+    public StringBuilder getServerLog() {
+        return serverLog;
+    }
+
+    public void setServerLog(StringBuilder serverLog) {
+        this.serverLog = serverLog;
+    }
+
+    public String getHost() {
+        return host;
     }
 
     public void setHost(String host) {
         this.host = host;
     }
 
+    public int getPort() {
+        return port;
+    }
+
     public void setPort(int port) {
         this.port = port;
     }
 
-
+    public static void main(String[] args) throws IOException {
+        Server localhost = new Server("localhost", 7777);
+        localhost.startServer();
+    }
 }
