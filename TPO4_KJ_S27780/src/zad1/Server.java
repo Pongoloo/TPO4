@@ -13,48 +13,61 @@ import java.util.Set;
 
 public class Server extends Thread {
 
-   private Map<SocketChannel,String> userMaps;
-    private Map<String,StringBuilder> logs;
+    private Map<SocketChannel, String> userMaps;
+    private Map<String, StringBuilder> logs;
     private StringBuilder serverLog;
     private String host;
     private int port;
 
-    private  ServerSocketChannel channel;
+    private ServerSocketChannel channel;
     private Selector selector;
-    private volatile boolean isRunning=true;
+    private volatile boolean isRunning = true;
 
     Server(String host, int port) {
-        userMaps= new HashMap<>();
+        userMaps = new HashMap<>();
         logs = new HashMap<>();
-        serverLog =new StringBuilder();
+        serverLog = new StringBuilder();
         this.host = host;
         this.port = port;
     }
 
     public void startServer() throws IOException {
-        this.start();
-    }
-    public void stopServer() {
-        isRunning=false;
-    }
-    @Override
-    public void run() {
-        try (
-                ServerSocketChannel socketChannel = ServerSocketChannel.open();
-                Selector selector1 = Selector.open();
-        ) {
-            this.channel = socketChannel;
-            this.selector = selector1;
-
+        try {
+            channel = ServerSocketChannel.open();
             channel.configureBlocking(false);
             channel.bind(new InetSocketAddress(host, port));
 
+            selector = Selector.open();
             channel.register(selector, SelectionKey.OP_ACCEPT);
 
+            this.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public void stopServer() {
+        isRunning = false;
+    }
+
+    @Override
+    public void run() {
+        try {
             handleConnections();
         } catch (IOException e) {
-            System.out.println("__________________________________");
-            System.out.println(serverLog);
+            throw new RuntimeException(e);
+        } finally {
+            try {
+                channel.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            try {
+                selector.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -86,110 +99,104 @@ public class Server extends Thread {
         }
     }
 
-    public void handleRequset (SocketChannel socketChannel) throws IOException {
+    public void handleRequset(SocketChannel socketChannel) throws IOException {
         if (!socketChannel.isOpen()) {
             return;
         }
         ByteBuffer buffer = ByteBuffer.allocateDirect(1024);
         int bytesRead = socketChannel.read(buffer);
         if (bytesRead == -1) {
-            System.out.println("connection done and dusted bytesRead:-1");
             socketChannel.close();
-        }
-        if (bytesRead == 0) {
-            System.out.println("everything that needed to be said was said...");
         }
         if (bytesRead > 0) {
             buffer.flip();
             byte[] bytes = new byte[buffer.remaining()];
             buffer.get(bytes);
             String request = new String(bytes);
-            System.out.print("odczytana wiadomosc: " + request);
 
-            writeResponse(socketChannel,request);
-            if (request.equals("nara")) {
-                socketChannel.close();
-            }
+            writeResponse(socketChannel, request);
+
         }
 
     }
-    public void writeResponse (SocketChannel socketChannel, String request) throws IOException {
+
+    public void writeResponse(SocketChannel socketChannel, String request) throws IOException {
         String response;
-        if(request.charAt(0)=='l'){ // login
+        if (request.charAt(0) == 'l') { // login
             String[] words = request.split(" ");
-            putNewUserInDB(strip(words[1]),socketChannel);
-            response= login(strip(words[1]));
-        } else{
-            response=getResponse(request,getIdByChannel(socketChannel));
+            putNewUserInDB(strip(words[1]), socketChannel);
+            response = login(strip(words[1]));
+        } else {
+            response = getResponse(request, getIdByChannel(socketChannel));
         }
         ByteBuffer encode = Charset.defaultCharset().encode(response);
         socketChannel.write(encode);
     }
-    private String getResponse(String request, String id){
-        updateGeneralLog(request,id);
-        updatePersonalLog(request,id);
 
-        if(request.equals("bye")){
+    private String getResponse(String request, String id) {
+        updateGeneralLog(request, id);
+        updatePersonalLog(request, id);
+
+        if (request.equals("bye")) {
             return "logged out";
-        } else{
+        } else {
             String[] words = request.split(" ");
-            if(words[0].equals("login")){
+            if (words[0].equals("login")) {
                 return "logged in";
-            } else if(words[0].equals("bye")){
+            } else if (words[0].equals("bye")) {
                 return getLogs().get(id).toString();
-            } else{
-                return Time.passed(strip(words[0]),strip(words[1]));
+            } else {
+                return Time.passed(strip(words[0]), strip(words[1]));
             }
         }
     }
-    private void updatePersonalLog(String request, String id){
-        if(request.charAt(0)=='l'){
-            logs.put(id,new StringBuilder());
+
+    private void updatePersonalLog(String request, String id) {
+        if (request.charAt(0) == 'l') {
+            logs.put(id, new StringBuilder());
             logs.get(id).append("=== ").append(id).append(" log start ===\nlogged in\n");
-        }else if(request.charAt(0)=='b'){
-            System.out.println(id);
-            System.out.println(id.length());
+        } else if (request.charAt(0) == 'b') {
             logs.get(id).append("logged out\n=== ").append(id).append(" log end ===\n");
-        } else{
+        } else {
             logs.get(id).append("Request: ").append(request).append("Result:\n");
             String[] dates = request.split(" ");
-            System.out.println(dates[0].equals("2019-01-10"));
-            System.out.println(dates[1].equals("2020-03-01"));
-            System.out.println(dates[1].length());
-            System.out.println("2020-03-01".length());
-            System.out.println(Time.passed(dates[0],dates[1]));
-            logs.get(id).append(Time.passed(strip(dates[0]),strip(dates[1]))).append('\n');
+            logs.get(id).append(Time.passed(strip(dates[0]), strip(dates[1]))).append('\n');
         }
     }
-    private void updateGeneralLog(String request, String id){
+
+    private void updateGeneralLog(String request, String id) {
         LocalTime now = LocalTime.now();
         String hourMinuteSecond = now.toString().substring(0, 9);
         String nanoSeconds = (now.getNano() + "").substring(0, 3);
-        String time=hourMinuteSecond+nanoSeconds;
-        if(request.charAt(0)=='l'){
+        String time = hourMinuteSecond + nanoSeconds;
+        if (request.charAt(0) == 'l') {
             serverLog.append(id).append(" logged in at ").append(time).append('\n');
-        }else if(request.charAt(0)=='b'){
+        } else if (request.charAt(0) == 'b') {
             serverLog.append(id).append(" logged out at ").append(time).append('\n');
 
-        } else{
+        } else {
             String s = request.replaceAll("\r\n", "");
             serverLog.append(id).append(" request at ").
                     append(time).append(": \"").append(s).append("\"").append("\n");
         }
     }
-    private String login(String id){
-        updatePersonalLog("login",id);
-        updateGeneralLog("login",id);
+
+    private String login(String id) {
+        updatePersonalLog("login", id);
+        updateGeneralLog("login", id);
         return "logged in";
     }
-    private void putNewUserInDB(String id, SocketChannel socketChannel){
+
+    private void putNewUserInDB(String id, SocketChannel socketChannel) {
         userMaps.put(socketChannel, id);
-        logs.put(id,new StringBuilder());
+        logs.put(id, new StringBuilder());
     }
-    private String getIdByChannel(SocketChannel socketChannel){
+
+    private String getIdByChannel(SocketChannel socketChannel) {
         return userMaps.get(socketChannel);
     }
-    private String strip(String string){
+
+    private String strip(String string) {
         return string.replaceAll("\\s", "");
     }
 

@@ -17,7 +17,8 @@ public class Main {
         List<ClientTask> ctasks = new ArrayList<>();
         List<String> clogs = new ArrayList<>();
 
-
+        Server s = new Server(host, port);
+        s.startServer();
 
         // start clients
         clRequests.forEach( (id, reqList) -> {
@@ -40,13 +41,19 @@ public class Main {
 
         if (concur) {
             ctasks.forEach( task -> {
-                String log = task.get();
-                clogs.add(log);
+                try {
+                    String log = task.get();
+                    clogs.add(log);
+                } catch (InterruptedException | ExecutionException exc) {
+                    System.out.println(exc);
+                }
             });
             clogs.forEach( System.out::println);
             es.shutdown();
         }
-
+        s.stopServer();
+        System.out.println("\n=== Server log ===");
+        System.out.println(s.getServerLog());
     }
 
 }

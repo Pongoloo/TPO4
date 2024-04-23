@@ -9,6 +9,7 @@ package zad1;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 public class ClientTask implements Runnable{
     private Client client;
@@ -33,7 +34,14 @@ public class ClientTask implements Runnable{
             handleClient();
         }
     }
-    public String get() {
+    public String get() throws InterruptedException, ExecutionException {
+        if(clientLog==null){
+            throw new InterruptedException("XD");
+        }
+        if(clientLog.equals("")){
+            throw new ExecutionException(
+                    new Throwable("VILLAIN MUSIC PLAYING"));
+        }
         return clientLog;
     }
     private void handleClient() {

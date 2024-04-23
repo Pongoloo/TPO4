@@ -33,8 +33,6 @@ public class Client {
         this.host = host;
         this.port = port;
         this.id = id;
-
-
     }
 
     public void connect() {
@@ -59,8 +57,6 @@ public class Client {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        //toDo potecjalnie ify obslugujace czy read==-1 i read==0
-        // still works so fuck it B)
         allocate.flip();
         return allocate.toString();
     }
