@@ -113,7 +113,6 @@ public class Server extends Thread {
             byte[] bytes = new byte[buffer.remaining()];
             buffer.get(bytes);
             String request = new String(bytes);
-
             writeResponse(socketChannel, request);
 
         }
@@ -244,4 +243,5 @@ public class Server extends Thread {
         Server localhost = new Server("localhost", 7777);
         localhost.startServer();
     }
+
 }
