@@ -49,6 +49,17 @@ public class Server extends Thread {
 
     public void stopServer() {
         isRunning = false;
+        try {
+            channel.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            selector.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
     @Override
@@ -75,6 +86,9 @@ public class Server extends Thread {
 
         while (isRunning) {
             selector.select();
+            if(!selector.isOpen()){
+                return;
+            }
             Set<SelectionKey> selectionKeys = selector.selectedKeys();
             Iterator<SelectionKey> iterator = selectionKeys.iterator();
 
@@ -157,7 +171,7 @@ public class Server extends Thread {
         } else if (request.charAt(0) == 'b') {
             logs.get(id).append("logged out\n=== ").append(id).append(" log end ===\n");
         } else {
-            logs.get(id).append("Request: ").append(request).append("Result:\n");
+            logs.get(id).append("Request: ").append(request).append("\nResult:\n");
             String[] dates = request.split(" ");
             logs.get(id).append(Time.passed(strip(dates[0]), strip(dates[1]))).append('\n');
         }
@@ -239,9 +253,6 @@ public class Server extends Thread {
         this.port = port;
     }
 
-    public static void main(String[] args) throws IOException {
-        Server localhost = new Server("localhost", 7777);
-        localhost.startServer();
-    }
+
 
 }

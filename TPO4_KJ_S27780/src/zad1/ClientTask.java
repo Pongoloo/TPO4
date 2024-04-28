@@ -12,7 +12,11 @@ public class ClientTask extends FutureTask<String> {
 
     public ClientTask(Client client, List<String> requirements, boolean showRes) {
         super(() -> {
-            return handleClient(client,requirements);
+            if(showRes){
+               return handleClientShowingServerOutputs(client,requirements);
+            } else{
+                return handleClient(client,requirements);
+            }
         });
         this.client=client;
         this.requirements=requirements;
@@ -36,20 +40,18 @@ public class ClientTask extends FutureTask<String> {
         return client.send("bye and log transfer");
     }
 
-    // Metoda statyczna do obsługi klienta z pokazywaniem wyników
-//    private static String handleClientShowingServerOutputs(Client client, List<String> requirements) {
-//        StringBuilder result = new StringBuilder();
-//        client.connect();
-//        result.append(client.send("login " + client.getId())).append("\n");
-//        for (String requirement : requirements) {
-//            result.append(client.send(requirement)).append("\n");
-//            result.append(requirement).append("\n");
-//        }
-//        result.append(client.send("bye and log transfer")).append("\n");
-//        return result.toString();
-//    }
+    private static String handleClientShowingServerOutputs(Client client, List<String> requirements) {
+        StringBuilder result = new StringBuilder();
+        client.connect();
+        result.append(client.send("login " + client.getId())).append("\n");
+        for (String requirement : requirements) {
+            result.append(client.send(requirement)).append("\n");
+            result.append(requirement).append("\n");
+        }
+        result.append(client.send("bye and log transfer")).append("\n");
+        return result.toString();
+    }
 
-    // Pozostała część klasy bez zmian
 
 
 
