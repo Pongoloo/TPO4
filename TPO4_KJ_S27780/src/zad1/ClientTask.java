@@ -12,21 +12,21 @@ public class ClientTask extends FutureTask<String> {
 
     public ClientTask(Client client, List<String> requirements, boolean showRes) {
         super(() -> {
-            if(showRes){
-               return handleClientShowingServerOutputs(client,requirements);
-            } else{
-                return handleClient(client,requirements);
+            if (showRes) {
+                return handleClientShowingServerOutputs(client, requirements);
+            } else {
+                return handleClient(client, requirements);
             }
         });
-        this.client=client;
-        this.requirements=requirements;
-        this.showRes=showRes;
+        this.client = client;
+        this.requirements = requirements;
+        this.showRes = showRes;
 
-        }
+    }
 
 
     public static ClientTask create(Client c, List<String> reqList, boolean showRes) {
-        return new ClientTask(c,reqList,showRes);
+        return new ClientTask(c, reqList, showRes);
     }
 
 
@@ -43,16 +43,13 @@ public class ClientTask extends FutureTask<String> {
     private static String handleClientShowingServerOutputs(Client client, List<String> requirements) {
         StringBuilder result = new StringBuilder();
         client.connect();
-        result.append(client.send("login " + client.getId())).append("\n");
+        client.send("login " + client.getId());
         for (String requirement : requirements) {
             result.append(client.send(requirement)).append("\n");
-            result.append(requirement).append("\n");
         }
-        result.append(client.send("bye and log transfer")).append("\n");
+        result.append(client.send("bye and log transfer"));
         return result.toString();
     }
-
-
 
 
     public Client getClient() {
