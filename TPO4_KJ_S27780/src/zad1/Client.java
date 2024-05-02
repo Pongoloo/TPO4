@@ -28,17 +28,13 @@ public class Client {
     private String host;
     private int port;
     private String id;
-    static int port_Unique;
     private SocketChannel socketChannel;
     private boolean isFinished=false;
 
 
-
-
     public Client(String host, int port, String id) {
-        port_Unique++;
         this.host = host;
-        this.port = port+port_Unique;
+        this.port = port;
         this.id = id;
 
     }
@@ -46,8 +42,8 @@ public class Client {
     public void connect() {
         try {
             socketChannel = SocketChannel.open();
-            socketChannel.bind(new InetSocketAddress(host,port));
-            socketChannel.connect(new InetSocketAddress("localhost",7777));
+            socketChannel.bind(null);
+            socketChannel.connect(new InetSocketAddress(host,port));
             socketChannel.configureBlocking(false);
         } catch (IOException e) {
             throw new RuntimeException(e);
